@@ -1,0 +1,15 @@
+.{
+    .name = .portaudio,
+    .version = "19.7.0",
+    .minimum_zig_version = "0.16.0",
+    .fingerprint = 0x2a7a2a316f30fe5a,
+    .dependencies = .{},
+    .paths = .{
+        "LICENSE.txt",
+        "build.zig",
+        "build.zig.zon",
+        "portaudio.zig",
+        "include",
+        "src",
+    },
+}
