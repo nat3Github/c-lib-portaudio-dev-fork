@@ -12,11 +12,14 @@ pub const HostApi = enum {
     wasapi,
     wdmks,
     wmme,
+    aaudio,
+    opensles,
 
     pub const defaults = struct {
         pub const macos: []const HostApi = &.{.coreaudio};
         pub const linux: []const HostApi = &.{ .alsa, .pulseaudio };
         pub const windows: []const HostApi = &.{.wasapi};
+        pub const android: []const HostApi = &.{ .aaudio, .opensles };
     };
 };
 
@@ -50,6 +53,11 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
     portaudio_mod.linkLibrary(lib);
+    if (target.result.abi.isAndroid()) {
+        if (paths.library) |p| portaudio_mod.addLibraryPath(p);
+        portaudio_mod.linkSystemLibrary("OpenSLES", .{ .use_pkg_config = .no });
+        portaudio_mod.linkSystemLibrary("dl", .{ .use_pkg_config = .no });
+    }
 
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&b.addRunArtifact(b.addTest(.{ .root_module = portaudio_mod })).step);
@@ -94,7 +102,7 @@ fn setupLib(
 
     const host_apis = host_api_opts orelse switch (t.result.os.tag) {
         .macos => HostApi.defaults.macos,
-        .linux => HostApi.defaults.linux,
+        .linux => if (t.result.abi.isAndroid()) HostApi.defaults.android else HostApi.defaults.linux,
         .windows => HostApi.defaults.windows,
         else => unsupportedOs(t.result.os.tag),
     };
@@ -121,7 +129,24 @@ fn setupLib(
             lib_mod.addIncludePath(b.path("src/os/unix"));
             lib_mod.addCSourceFiles(.{ .root = pa_root, .files = src_os_unix, .flags = flags.items });
         },
-        .linux => {
+        .linux => if (t.result.abi.isAndroid()) {
+            lib_mod.pic = true;
+            for (host_apis) |api| {
+                switch (api) {
+                    .aaudio => {
+                        try flags.append(b.allocator, "-DPA_USE_AAUDIO=1");
+                        lib_mod.addCSourceFiles(.{ .root = pa_root, .files = src_hostapi_aaudio });
+                    },
+                    .opensles => {
+                        try flags.append(b.allocator, "-DPA_USE_OPENSLES=1");
+                        lib_mod.addCSourceFiles(.{ .root = pa_root, .files = src_hostapi_opensles });
+                    },
+                    else => unsupportedHostApi(t.result.os.tag, api),
+                }
+            }
+            lib_mod.addIncludePath(b.path("src/os/unix"));
+            lib_mod.addCSourceFiles(.{ .root = pa_root, .files = src_os_unix, .flags = flags.items });
+        } else {
             for (host_apis) |api| {
                 switch (api) {
                     .alsa => {
@@ -212,6 +237,14 @@ const src_os_win = &.{
     "src/os/win/pa_win_waveformat.c",
     "src/os/win/pa_win_wdmks_utils.c",
     "src/os/win/pa_x86_plain_converters.c",
+};
+
+const src_hostapi_aaudio = &.{
+    "src/hostapi/aaudio/pa_aaudio.c",
+};
+
+const src_hostapi_opensles = &.{
+    "src/hostapi/opensles/pa_opensles.c",
 };
 
 const src_hostapi_alsa = &.{

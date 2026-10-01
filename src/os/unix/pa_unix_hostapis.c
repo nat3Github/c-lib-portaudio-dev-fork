@@ -52,6 +52,8 @@ PaError PaAudioIO_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIn
 PaError PaAsiHpi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex index );
 PaError PaMacCore_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex index );
 PaError PaSkeleton_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex index );
+PaError PaAAudio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex index );
+PaError PaOpenSLES_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex index );
 
 /** Note that on Linux, ALSA is placed before OSS so that the former is preferred over the latter.
  */
@@ -110,6 +112,14 @@ PaUtilHostApiInitializer *paHostApiInitializers[] =
 
 #if PA_USE_SKELETON
         PaSkeleton_Initialize,
+#endif
+
+#if PA_USE_AAUDIO
+        PaAAudio_Initialize,
+#endif
+
+#if PA_USE_OPENSLES
+        PaOpenSLES_Initialize,
 #endif
 
         0   /* NULL terminated array */

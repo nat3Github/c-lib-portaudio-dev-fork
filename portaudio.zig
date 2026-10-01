@@ -1,3 +1,4 @@
+const builtin = @import("builtin");
 const std = @import("std");
 const assert = std.debug.assert;
 const expect = std.debug.expect;
@@ -192,6 +193,14 @@ fn errify(err: c.PaError) !void {
     }
 }
 
+pub const android = struct {
+    extern fn PaAndroid_SetJavaContext(vm: *anyopaque, context: ?*anyopaque) void;
+    pub fn setJavaContext(vm: *anyopaque, context: ?*anyopaque) void {
+        if (comptime !builtin.abi.isAndroid()) return;
+        PaAndroid_SetJavaContext(vm, context);
+    }
+};
+
 pub fn init() !PortAudio {
     try errify(c.Pa_Initialize());
     return PortAudio{};
@@ -234,8 +243,8 @@ pub fn index_of_default_output_device(_: *PortAudio) !usize {
 
 pub const Stream = struct {
     const Config = struct {
-        input_params: c.PaStreamParameters,
-        output_params: c.PaStreamParameters,
+        input_params: ?c.PaStreamParameters,
+        output_params: ?c.PaStreamParameters,
         srate: f64,
         frames: u64,
         flags: c.PaStreamFlags,
@@ -249,8 +258,8 @@ pub const Stream = struct {
         var ptr: ?*c.PaStream = null;
         const err = c.Pa_OpenStream(
             &ptr,
-            &cfg.input_params,
-            &cfg.output_params,
+            if (cfg.input_params) |*p| p else null,
+            if (cfg.output_params) |*p| p else null,
             cfg.srate,
             @intCast(cfg.frames),
             cfg.flags,
@@ -327,17 +336,10 @@ pub const TStreamF32 = struct {
         _: c.PaStreamCallbackFlags,
         user_data: ?*anyopaque,
     ) callconv(.c) c_int {
-        if (in_ptr == null or out_ptr == null) return c.paAbort;
         const ud = @as(*UserData, @ptrCast(@alignCast(user_data)));
         const frames: usize = @intCast(cframes);
-
-        const in_slc = @as([*]const f32, @ptrCast(@alignCast(in_ptr.?)))[0 .. frames * ud.in_channels];
-
-        const out_p: [*]f32 = @ptrCast(@alignCast(out_ptr));
-        var out_slice: []f32 = undefined;
-        out_slice.len = frames * ud.out_channels;
-        out_slice.ptr = out_p;
-
+        const in_slc: []const f32 = if (in_ptr) |p| @as([*]const f32, @ptrCast(@alignCast(p)))[0 .. frames * ud.in_channels] else &.{};
+        const out_slice: []f32 = if (out_ptr) |p| @as([*]f32, @ptrCast(@alignCast(p)))[0 .. frames * ud.out_channels] else &.{};
         ud.t_callback(ud.t, in_slc, out_slice, frames);
         return c.paContinue;
     }
@@ -362,14 +364,14 @@ pub const TStreamF32 = struct {
         const config: Stream.Config = .{
             .flags = flags orelse c.paNoFlag,
             .frames = frames,
-            .input_params = .{
+            .input_params = if (in_channels == 0) null else .{
                 .channelCount = @intCast(in_channels),
                 .sampleFormat = c.paFloat32,
                 .suggestedLatency = 0,
                 .device = @intCast(in_device_idx),
                 .hostApiSpecificStreamInfo = null,
             },
-            .output_params = .{
+            .output_params = if (out_channels == 0) null else .{
                 .channelCount = @intCast(out_channels),
                 .sampleFormat = c.paFloat32,
                 .suggestedLatency = 0,
