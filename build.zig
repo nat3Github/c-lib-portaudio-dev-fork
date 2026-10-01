@@ -95,6 +95,7 @@ fn setupLib(
     if (paths.library) |p| lib_mod.addLibraryPath(p);
     const pkg_config: std.Build.Module.SystemLib.UsePkgConfig = if (t.query.isNative()) .yes else .no;
 
+    lib_mod.addCMacro(if (t.result.cpu.arch.endian() == .little) "PA_LITTLE_ENDIAN" else "PA_BIG_ENDIAN", "1");
     lib_mod.addIncludePath(b.path("include"));
     lib_mod.addIncludePath(b.path("src/common"));
     lib.installHeadersDirectory(b.path("include"), "", .{});

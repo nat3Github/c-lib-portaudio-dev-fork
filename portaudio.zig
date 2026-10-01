@@ -7,6 +7,7 @@ const panic = std.debug.panic;
 pub const c = struct {
     pub const PaError = c_int;
     pub const paNoError: PaError = 0;
+    pub const paNoDevice: PaDeviceIndex = -1;
     pub const paNotInitialized: PaError = -10000;
     pub const paUnanticipatedHostError: PaError = -9999;
     pub const paInvalidChannelCount: PaError = -9998;
@@ -232,12 +233,12 @@ pub fn get_device_info(self: *PortAudio, device_idx: usize) *const c.struct_PaDe
 }
 pub fn index_of_default_input_device(_: *PortAudio) !usize {
     const res = c.Pa_GetDefaultInputDevice();
-    try errify_print(res);
+    if (res == c.paNoDevice) return error.PortAudioNoDevice;
     return @intCast(res);
 }
 pub fn index_of_default_output_device(_: *PortAudio) !usize {
     const res = c.Pa_GetDefaultOutputDevice();
-    try errify_print(res);
+    if (res == c.paNoDevice) return error.PortAudioNoDevice;
     return @intCast(res);
 }
 
